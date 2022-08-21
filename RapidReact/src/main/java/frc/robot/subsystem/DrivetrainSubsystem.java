@@ -9,6 +9,7 @@ import com.swervedrivespecialties.swervelib.Mk4SwerveModuleHelper;
 import com.swervedrivespecialties.swervelib.SdsModuleConfigurations;
 import com.swervedrivespecialties.swervelib.SwerveModule;
 import edu.wpi.first.math.MathUtil;
+import edu.wpi.first.math.controller.ProfiledPIDController;
 import edu.wpi.first.math.controller.SimpleMotorFeedforward;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
@@ -17,6 +18,7 @@ import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
 import edu.wpi.first.math.kinematics.SwerveDriveOdometry;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
+import edu.wpi.first.math.trajectory.TrapezoidProfile;
 import edu.wpi.first.wpilibj.SPI;
 import edu.wpi.first.wpilibj.shuffleboard.BuiltInLayouts;
 import edu.wpi.first.wpilibj.shuffleboard.Shuffleboard;
@@ -137,6 +139,10 @@ public class DrivetrainSubsystem extends BitBucketsSubsystem {
     //this.chassisSpeeds = new ChassisSpeeds(0.0, 0.0, 0.0);
 
     this.initializeModules();
+
+    controller.enableContinuousInput(-Math.PI, Math.PI);
+    controller.setTolerance(0.1, 0.1); // about 0.1 radians = 6 degrees, 6 deg/sec
+
 
     setOdometry(new Pose2d());
   }
@@ -332,5 +338,33 @@ public class DrivetrainSubsystem extends BitBucketsSubsystem {
   public void disable() {
     stop();
   }
+
+
+
+  //ANGLE STUFF
+
+  double integralGain = 0.2;
+
+  private final ProfiledPIDController controller = new ProfiledPIDController(
+          config.auto.pathThetaPID.getKP(),
+          integralGain,
+          config.auto.pathThetaPID.getKD(),
+          new TrapezoidProfile.Constraints(
+                  getMaxAngularVelocity(),
+                  getMaxAngularVelocity() * 10.0
+          )
+  );
+
+  public double calculateAngleFromDrive(double angle) { //call from command
+    double outputRot = controller.calculate(gyro.getAngle(), angle);
+    if (Math.abs(outputRot) < 0.05) {
+      outputRot = 0.0; //deadband that shit
+    }
+
+    return outputRot;
+  }
+
+
+
   
 }
